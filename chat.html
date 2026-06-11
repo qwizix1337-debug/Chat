@@ -304,6 +304,92 @@
     }
     .empty-chat span { font-size: 2.5rem; }
 
+    /* Online users panel */
+    .chat-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .chat-main {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #online-panel {
+      width: 200px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+
+    .online-title {
+      padding: 14px 14px 8px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .online-list {
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .online-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      animation: msgIn 0.2s ease both;
+    }
+
+    .online-user .avatar-sm {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .online-user-name {
+      font-size: 0.82rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .online-user-me {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    .online-dot {
+      width: 7px; height: 7px;
+      background: #4ade80;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-left: auto;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @media (max-width: 600px) {
+      #online-panel { width: 130px; }
+      .online-user-name { font-size: 0.75rem; }
+    }
+
     /* Error toast */
     #error-toast {
       position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
@@ -343,6 +429,8 @@
     <button class="btn-leave" onclick="leaveChat()">Выйти</button>
   </div>
 
+  <div class="chat-body">
+  <div class="chat-main">
   <div id="messages">
     <div class="empty-chat" id="empty-state">
       <span>👋</span>
@@ -358,7 +446,15 @@
       <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
     </button>
   </div>
-</div>
+  </div><!-- chat-main -->
+
+  <div id="online-panel">
+    <div class="online-title">👥 Онлайн</div>
+    <div class="online-list" id="online-list"></div>
+  </div>
+
+</div><!-- chat-body -->
+</div><!-- chat-screen -->
 
 <div id="error-toast"></div>
 
@@ -439,10 +535,24 @@
     // Set up typing ref
     typingRef = ref(db, `rooms/${roomId}/typing/${myName}`);
     onDisconnect(typingRef).remove();
+
+    // Online presence
+    const onlineRef = ref(db, `rooms/${roomId}/online/${myName}`);
+    set(onlineRef, { name: myName, ts: Date.now() });
+    onDisconnect(onlineRef).remove();
+
+    // Listen online users
+    const onlineRoomRef = ref(db, `rooms/${roomId}/online`);
+    onValue(onlineRoomRef, snap => {
+      const data = snap.val() || {};
+      renderOnline(data);
+    });
   };
 
   window.leaveChat = function() {
     if (typingRef) remove(typingRef);
+    const onlineRef = ref(db, `rooms/${roomId}/online/${myName}`);
+    remove(onlineRef);
     document.getElementById('chat-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('messages').innerHTML =
@@ -569,6 +679,54 @@
     if (wasAtBottom || container.children.length <= 2) {
       container.scrollTop = container.scrollHeight;
     }
+  }
+
+  function renderOnline(data) {
+    const list = document.getElementById('online-list');
+    list.innerHTML = '';
+    const title = document.querySelector('.online-title');
+    const count = Object.keys(data).length;
+    title.textContent = `👥 Онлайн · ${count}`;
+
+    // Me first, then others
+    const entries = Object.values(data).sort((a, b) => {
+      if (a.name === myName) return -1;
+      if (b.name === myName) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    entries.forEach(u => {
+      const div = document.createElement('div');
+      div.className = 'online-user';
+
+      const av = document.createElement('div');
+      av.className = 'avatar-sm';
+      av.textContent = initials(u.name);
+      av.style.background = nameColor(u.name);
+
+      const nameWrap = document.createElement('div');
+      nameWrap.style.overflow = 'hidden';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'online-user-name';
+      nameEl.textContent = u.name;
+
+      nameWrap.appendChild(nameEl);
+      if (u.name === myName) {
+        const meEl = document.createElement('div');
+        meEl.className = 'online-user-me';
+        meEl.textContent = 'Это ты';
+        nameWrap.appendChild(meEl);
+      }
+
+      const dot = document.createElement('div');
+      dot.className = 'online-dot';
+
+      div.appendChild(av);
+      div.appendChild(nameWrap);
+      div.appendChild(dot);
+      list.appendChild(div);
+    });
   }
 
   function showError(msg) {
