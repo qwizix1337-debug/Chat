@@ -39,10 +39,17 @@
   --accent:#6c8cff;--accent2:#a78bfa;--text:#e8eaf6;--muted:#7b82a8;
   --me-bg:linear-gradient(135deg,#6c8cff,#a78bfa);--them-bg:#2a2f47;--radius:18px;
 }
-html,body{height:100%}
-/* iOS safe area */
-body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+html{height:100%;height:-webkit-fill-available}
+body{
+  font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;flex-direction:column;
+  height:100vh;height:-webkit-fill-available;
+  overflow:hidden;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+}
 
 /* AUTH */
 .auth-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;gap:18px;background:radial-gradient(ellipse 80% 60% at 50% 40%,#1a1f3a 0%,var(--bg) 70%)}
@@ -222,6 +229,23 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .ctx-item.danger{color:#f87171}
 
 @media(max-width:500px){#online-panel{width:110px}.online-uname{font-size:.7rem}}
+/* tablet / large screens */
+@media(min-width:768px){
+  .auth-form{max-width:400px}
+  .msg-bubble{font-size:.95rem}
+  #online-panel{width:220px}
+  .chat-header{padding:14px 20px}
+  .input-area{padding:12px 16px 16px}
+}
+@media(min-width:1024px){
+  #online-panel{width:260px}
+  #messages{padding:20px 20px 10px}
+}
+/* fix Safari 100vh */
+#chat-screen{height:100%;height:-webkit-fill-available}
+.chat-body{min-height:0}
+#messages{min-height:0;-webkit-overflow-scrolling:touch}
+
 </style>
 </head>
 <body>
@@ -510,7 +534,11 @@ function startChat(name,safeRoom,dispRoom){
   updateMyHeaderAv();
   loadBg();
 
-  onValue(ref(db,`rooms/${roomId}/messages`),snap=>{allMessages=snap.val()||{};renderMessages(allMessages);});
+  // Force fresh data on Safari by using limitToLast with a large number
+  onValue(ref(db,`rooms/${roomId}/messages`),snap=>{
+    allMessages=snap.val()||{};
+    renderMessages(allMessages);
+  },{onlyOnce:false});
   onValue(ref(db,`rooms/${roomId}/typing`),snap=>{
     const d=snap.val()||{};
     const o=Object.entries(d).filter(([k,v])=>k!==myName&&v).map(([k])=>k);
@@ -785,7 +813,9 @@ function renderMessages(msgs){
     row.appendChild(wrap);
     c.appendChild(row);
   });
-  if(atBot)c.scrollTop=c.scrollHeight;
+  if(atBot){
+    requestAnimationFrame(()=>{c.scrollTop=c.scrollHeight;});
+  }
 }
 
 function scrollToMsg(id){
