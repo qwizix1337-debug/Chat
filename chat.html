@@ -181,6 +181,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);color:var(--text);border:1px solid var(--border);padding:9px 20px;border-radius:30px;font-size:.82rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:300;white-space:nowrap}
 #toast.show{opacity:1}
 
+/* message action buttons */
+.msg-action-btn{width:28px;height:28px;border-radius:50%;background:var(--panel);border:1px solid var(--border);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.8rem;transition:all .15s;padding:0;line-height:1}
+.msg-action-btn:hover{color:var(--text);border-color:var(--accent);transform:scale(1.1)}
+.msg-action-btn.del:hover{color:#f87171;border-color:#f87171}
+
 /* context menu (long press / right click) */
 .ctx-menu{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;z-index:80;box-shadow:0 8px 28px rgba(0,0,0,.5);animation:popIn .15s ease;min-width:150px}
 .ctx-item{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;font-size:.85rem;cursor:pointer;transition:background .15s}
@@ -688,6 +693,37 @@ function renderMessages(msgs){
     btmRow.appendChild(tm);btmRow.appendChild(rb);
     bub.appendChild(btmRow);
     wrap.appendChild(bub);
+
+    // action buttons: reply + delete (shown on hover/tap)
+    const actions=document.createElement('div');
+    actions.className='msg-actions';
+    actions.style.cssText=`display:flex;flex-direction:column;gap:4px;align-self:center;opacity:0;transition:opacity .15s;${isMe?'margin-right:6px':'margin-left:6px'}`;
+
+    const replyBtn=document.createElement('button');
+    replyBtn.className='msg-action-btn';
+    replyBtn.title='Ответить';replyBtn.textContent='↩';
+    replyBtn.onclick=(e)=>{e.stopPropagation();startReply(id,msg);};
+
+    actions.appendChild(replyBtn);
+
+    if(isMe){
+      const delBtn=document.createElement('button');
+      delBtn.className='msg-action-btn del';
+      delBtn.title='Удалить';delBtn.textContent='🗑';
+      delBtn.onclick=(e)=>{e.stopPropagation();if(confirm('Удалить сообщение?'))remove(ref(db,`rooms/${roomId}/messages/${id}`));};
+      actions.appendChild(delBtn);
+    }
+
+    // show/hide on hover and tap
+    row.addEventListener('mouseenter',()=>actions.style.opacity='1');
+    row.addEventListener('mouseleave',()=>actions.style.opacity='0');
+    let tapShown=false;
+    row.addEventListener('touchstart',()=>{
+      if(!tapShown){actions.style.opacity='1';tapShown=true;setTimeout(()=>{actions.style.opacity='0';tapShown=false;},3000);}
+    },{passive:true});
+
+    if(isMe) row.insertBefore(actions, wrap);
+    else row.appendChild(actions);
 
     // reactions
     if(msg.reactions){
